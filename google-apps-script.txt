@@ -1,0 +1,89 @@
+// ─── MMM Agency — Google Apps Script ───────────────────────────────────────
+// REDEPLOY INSTRUCTIONS (you must do this every time you update the script):
+//
+// 1. Open https://script.google.com and open your existing project
+// 2. Delete all existing code and paste EVERYTHING below
+// 3. Save (Ctrl+S / Cmd+S)
+// 4. Click "Deploy" → "New Deployment"  ← must be NEW, not edit existing
+//    - Click the gear ⚙ → "Web app"
+//    - Execute as: Me
+//    - Who has access: Anyone
+// 5. Click "Deploy" → Authorise if prompted
+// 6. Copy the new Web App URL and replace SHEETS_WEBHOOK in App.tsx
+// ────────────────────────────────────────────────────────────────────────────
+
+var SHEET_ID   = "10KBGmP8k4nLYgMrfjiABzJDfV-q6X7AfVSZGte5Dlq8";
+var SHEET_NAME = "Sheet1"; // change if your tab has a different name
+
+// Exact column order that will appear in the sheet
+var COLUMNS = [
+  { key: "timestamp",      label: "Timestamp"              },
+  { key: "fullName",       label: "Full Name"               },
+  { key: "email",          label: "Email"                   },
+  { key: "whatsapp",       label: "WhatsApp Number"         },
+  { key: "services",       label: "Services Interested In"  },
+  { key: "monthlyRevenue", label: "Monthly Revenue"         },
+  { key: "budget",         label: "Budget"                  },
+  { key: "readyToStart",   label: "Ready to Start"          },
+];
+
+function doPost(e) {
+  try {
+    var raw  = (e.postData && e.postData.contents) ? e.postData.contents : "{}";
+    var data = JSON.parse(raw);
+
+    var ss    = SpreadsheetApp.openById(SHEET_ID);
+    var sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
+
+    // Create header row on first run
+    if (sheet.getLastRow() === 0) {
+      var headers = COLUMNS.map(function(c) { return c.label; });
+      sheet.appendRow(headers);
+      var headerRange = sheet.getRange(1, 1, 1, headers.length);
+      headerRange.setFontWeight("bold");
+      headerRange.setBackground("#e01010");
+      headerRange.setFontColor("#ffffff");
+      sheet.setFrozenRows(1);
+    }
+
+    // Build the row in the exact column order defined above
+    var row = COLUMNS.map(function(c) {
+      if (c.key === "timestamp") {
+        return data[c.key] || new Date().toLocaleString("en-GB", { timeZone: "UTC" });
+      }
+      return (data[c.key] !== undefined && data[c.key] !== null) ? String(data[c.key]) : "";
+    });
+
+    sheet.appendRow(row);
+
+    return ContentService
+      .createTextOutput(JSON.stringify({ result: "success" }))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    Logger.log("doPost error: " + err.message);
+    return ContentService
+      .createTextOutput(JSON.stringify({ result: "error", error: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ── Run this manually in the editor to verify before redeploying ─────────────
+function testSubmission() {
+  var fakeEvent = {
+    postData: {
+      contents: JSON.stringify({
+        timestamp:      "21/07/2026, 10:00:00",
+        fullName:       "Test Client",
+        email:          "test@example.com",
+        whatsapp:       "+1 234 567 8900",
+        services:       "Video Ads, Short-Form Video Content",
+        monthlyRevenue: "$10k – $50k",
+        budget:         "$3k – $5k",
+        readyToStart:   "Yes, I'm ready to start now!"
+      })
+    }
+  };
+  var result = doPost(fakeEvent);
+  Logger.log(result.getContent()); // should log: {"result":"success"}
+}
